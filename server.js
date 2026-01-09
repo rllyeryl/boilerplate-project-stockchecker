@@ -8,6 +8,8 @@ const helmet = require('helmet');
 const apiRoutes         = require('./routes/api.js');
 const fccTestingRoutes  = require('./routes/fcctesting.js');
 const runner            = require('./test-runner');
+const mongoose = require('mongoose');
+
 
 const app = express();
 
@@ -25,6 +27,11 @@ app.use(helmet.contentSecurityPolicy({
     styleSrc: ["'self'"],
   }
 }));
+
+//Mongoose connect
+mongoose.connect(process.env.DB)
+  .then(() => console.log("Database connected successfully"))
+  .catch(err => console.error("Database connection error:", err));
 
 //Index page (static HTML)
 app.route('/')
