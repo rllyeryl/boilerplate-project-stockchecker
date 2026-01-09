@@ -1,40 +1,40 @@
 'use strict';
 const crypto = require('crypto');
-const StockModel = require('../models'); // Ensure path to models.js is correct
-const fetch = require('node-fetch'); // You may need to npm install node-fetch@2
+const StockModel = require('../models'); 
+const fetch = require('node-fetch');
 
-// Helper to hash IP
 function getIPHash(ip) {
   return crypto.createHash('sha256').update(ip).digest('hex');
 }
 
-// Helper to fetch stock data from FCC Proxy
 async function fetchStock(stock) {
-  const symbolUpper = stock.toUpperCase();
-  const response = await fetch(`https://stock-price-checker-proxy.freecodecamp.rocks/v1/stock/${stock}/quote`);
-  const { symbol, latestPrice } = await response.json();
-  return { symbol, price: latestPrice };
+  try {
+    const response = await fetch(`https://stock-price-checker-proxy.freecodecamp.rocks/v1/stock/${stock}/quote`);
+    const data = await response.json();
+    if (!data || typeof data === 'string' || !data.symbol) {
+      return { symbol: stock.toUpperCase(), price: 0 };
+    }
+    return { symbol: data.symbol, price: data.latestPrice };
+  } catch (e) {
+    return { symbol: stock.toUpperCase(), price: 0 };
+  }
 }
 
 module.exports = function (app) {
-
   app.route('/api/stock-prices')
     .get(async function (req, res) {
       const { stock, like } = req.query;
       const clientIp = req.ip;
       const hashedIp = getIPHash(clientIp);
-
-      // 1. Normalize stock input (make it an array even if it's one string)
       const stockSymbols = Array.isArray(stock) ? stock : [stock];
 
       try {
-        // 2. Process each stock
-        const stockData = await Promise.all(stockSymbols.map(async (symbol) => {
+        const stockData = [];
+
+        // SEQUENTIAL LOOP: This prevents the "stall" on Render/MongoDB Free Tier
+        for (let symbol of stockSymbols) {
           const { symbol: name, price } = await fetchStock(symbol);
           
-          if (!name) return { error: "external source error", rel_likes: 0 };
-
-          // 3. Find or Create stock in DB and handle likes
           let stockDoc = await StockModel.findOne({ symbol: name });
           if (!stockDoc) {
             stockDoc = await StockModel.create({ symbol: name, likes: [] });
@@ -45,14 +45,14 @@ module.exports = function (app) {
             await stockDoc.save();
           }
 
-          return {
+          stockData.push({
             stock: name,
             price: price,
             likesCount: stockDoc.likes.length
-          };
-        }));
+          });
+        }
 
-        // 4. Format Output (Single vs Double)
+        // FORMATTING THE RESPONSE
         if (stockData.length === 1) {
           return res.json({
             stockData: {
@@ -62,7 +62,6 @@ module.exports = function (app) {
             }
           });
         } else {
-          // Calculate relative likes
           return res.json({
             stockData: [
               {
@@ -79,7 +78,7 @@ module.exports = function (app) {
           });
         }
       } catch (err) {
-        console.error(err);
+        console.error("Route Error:", err);
         res.status(500).json({ error: "Server Error" });
       }
     });
