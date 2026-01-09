@@ -40,7 +40,7 @@ suite('Functional Tests', function() {
      .get('/api/stock-prices')
      .query({ stock: 'goog', like: 'true' })
      .end(function(err, res) {
-       // We save the first response's likes to compare
+      
        const firstLikeCount = res.body.stockData.likes;
        
        chai.request(server)
@@ -53,16 +53,40 @@ suite('Functional Tests', function() {
      });
   });
 
-  // 4. Viewing two stocks
+ // 4. Viewing two stocks
   test('Viewing two stocks: GET /api/stock-prices?stock=goog&stock=msft', function(done) {
-    // Logic for two stocks (expecting an array and rel_likes)
-    done(); 
+    chai.request(server)
+      .get('/api/stock-prices')
+      .query({ stock: ['goog', 'msft'] })
+      .end(function(err, res) {
+        try {
+          assert.equal(res.status, 200);
+          assert.isArray(res.body.stockData);
+          assert.equal(res.body.stockData[0].stock, 'GOOG');
+          assert.equal(res.body.stockData[1].stock, 'MSFT');
+          done(); // Move to the next test no matter what
+        } catch (e) {
+          done(e); // Pass the error to Mocha so it logs it and continues
+        }
+      });
   });
 
   // 5. Viewing two stocks and liking them
   test('Viewing two stocks and liking them: GET /api/stock-prices?stock=goog&stock=msft&like=true', function(done) {
-    // Logic for two stocks with likes
-    done();
+    chai.request(server)
+      .get('/api/stock-prices')
+      .query({ stock: ['goog', 'msft'], like: 'true' })
+      .end(function(err, res) {
+        try {
+          assert.equal(res.status, 200);
+          assert.isArray(res.body.stockData);
+          assert.exists(res.body.stockData[0].rel_likes);
+          assert.equal(res.body.stockData[0].rel_likes + res.body.stockData[1].rel_likes, 0);
+          done();
+        } catch (e) {
+          done(e);
+        }
+      });
   });
 
 });
