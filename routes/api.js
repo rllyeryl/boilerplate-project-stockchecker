@@ -10,6 +10,7 @@ function getIPHash(ip) {
 
 // Helper to fetch stock data from FCC Proxy
 async function fetchStock(stock) {
+  const symbolUpper = stock.toUpperCase();
   const response = await fetch(`https://stock-price-checker-proxy.freecodecamp.rocks/v1/stock/${stock}/quote`);
   const { symbol, latestPrice } = await response.json();
   return { symbol, price: latestPrice };
